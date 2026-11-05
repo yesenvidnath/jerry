@@ -1,14 +1,11 @@
-"""Assistant API request and response schemas."""
+"""Assistant chat request and response schemas."""
 
-from typing import Literal
 from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     session_id: str = Field(default="demo", min_length=1, max_length=120)
-    user_id: str = Field(default="demo", min_length=1, max_length=120)
-    role: Literal["Viewer", "Analyst", "Administrator"] = "Viewer"
 
 
 class Citation(BaseModel):

@@ -65,3 +65,16 @@ This is a bounded RLM demonstration: targeted retrieval and Python-controlled su
 Chat now runs through the Streamlit interface and `POST /api/chat`. Each UI session gets a unique session ID and carries the demo user ID and selected role to the backend. The API stores up to the 3 most recent exchanges per session in bounded process memory (up to 1,000 sessions). Recent user questions can clarify short follow-ups; previous assistant text is context only and retrieved documents remain the source of facts. OpenAI prompts receive a small conversation window with that same rule. Use **Clear conversation memory** to start a fresh session.
 
 This demo memory is in-process and is cleared when the API restarts; it is not durable across deployments or shared across multiple workers. The API binds a session to the first user ID and role that uses it and rejects a change for that session. The current role/user fields are demo inputs, not authenticated identity; the RBAC stage will replace them with server-verified identity.
+
+## Tools and role-based access
+
+Use the demo account selector in the Streamlit sidebar. The backend derives the role from the `X-Demo-Token` header; the chat body no longer accepts a role. Local example tokens live in `.env.example` and can be overridden with environment variables. Do not deploy the example tokens as real credentials.
+
+```bash
+curl -X POST http://127.0.0.1:8010/api/chat \
+  -H "X-Demo-Token: viewer-demo-token" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"What caused settlement delays?","session_id":"demo-session"}'
+```
+
+Viewers can chat and search. Analysts can also run structured Python analysis and MCP-style employee/service tools. Administrators can use all tools, including `GET /api/tools/admin/index-status`. A Viewer request routed to multi-document analysis is safely denied with a visible authorization event; direct calls to protected analyst tools return HTTP 403. See [role permissions and endpoints](docs/rbac-tools.md).

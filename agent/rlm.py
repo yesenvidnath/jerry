@@ -6,7 +6,7 @@ from typing import Any
 from agent.memory import contextualize_query
 from models.analysis import AnalysisPlan
 from models.retrieval import RetrievalFilters
-from retrieval.hybrid import aretrieve
+from tools.knowledge_search import search_knowledge
 from tools.analysis import aggregate_findings, analyze_batch, make_batches
 
 
@@ -46,7 +46,7 @@ async def retrieve_analysis_documents(state: dict[str, Any]) -> dict[str, Any]:
         created_before=plan["created_before"],
     )
     try:
-        retrieved = await aretrieve(plan["topic_query"], top_k=plan["batch_size"] * plan["max_batches"], filters=filters)
+        retrieved = await search_knowledge(plan["topic_query"], state.get("role", "Viewer"), top_k=plan["batch_size"] * plan["max_batches"], filters=filters)
         passages = [item.model_dump(mode="json") for item in retrieved]
         errors = []
         detail = f"Found {len(passages)} matching passages"
@@ -61,7 +61,7 @@ async def retrieve_analysis_documents(state: dict[str, Any]) -> dict[str, Any]:
 def analyze_batches(state: dict[str, Any]) -> dict[str, Any]:
     plan = state["rlm_plan"]
     batches = make_batches(state.get("retrieved", []), plan["batch_size"], plan["max_batches"])
-    results = [analyze_batch(index, batch) for index, batch in enumerate(batches, start=1)]
+    results = [analyze_batch(index, batch, state.get("role", "Viewer")) for index, batch in enumerate(batches, start=1)]
     events = list(state.get("activity", []))
     for result in results:
         events.append({

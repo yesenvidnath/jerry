@@ -1,10 +1,11 @@
-"""Streamlit chat UI with recent history and agent activity."""
+"""Streamlit chat UI with recent history, roles, and activity."""
 
 from uuid import uuid4
 
 import streamlit as st
 
 from core.config import settings
+from security.auth import DEFAULT_DEMO_USERS
 from ui.api_client import clear_memory, send_chat
 
 st.set_page_config(page_title="Jerry", page_icon="🏦", layout="wide")
@@ -21,18 +22,19 @@ if "last_activity" not in st.session_state:
 with st.sidebar:
     st.subheader("Demo session")
     api_url = st.text_input("Backend URL", value=settings.api_base_url)
-    user_id = st.text_input("Demo user ID", value="demo-user")
-    role = st.selectbox("Demo role", ["Viewer", "Analyst", "Administrator"])
+    user_id = st.selectbox("Demo account", list(DEFAULT_DEMO_USERS))
+    env_name, fallback_token, role = DEFAULT_DEMO_USERS[user_id]
+    token = st.text_input("Demo access token", value=__import__("os").getenv(env_name, fallback_token), type="password")
+    st.caption(f"Role: **{role}** · Session: {st.session_state.session_id[:8]}…")
     profile = (user_id, role)
     if st.session_state.get("profile") not in (None, profile):
         st.session_state.session_id = uuid4().hex
         st.session_state.messages = []
         st.session_state.last_activity = []
     st.session_state.profile = profile
-    st.caption(f"Session: {st.session_state.session_id[:8]}…")
     if st.button("Clear conversation memory", use_container_width=True):
         try:
-            clear_memory(api_url, st.session_state.session_id, user_id)
+            clear_memory(api_url, st.session_state.session_id, token)
             st.session_state.messages = []
             st.session_state.last_activity = []
             st.session_state.session_id = uuid4().hex
@@ -59,9 +61,7 @@ if prompt:
                 response = send_chat(api_url, {
                     "query": prompt,
                     "session_id": st.session_state.session_id,
-                    "user_id": user_id,
-                    "role": role,
-                })
+                }, token)
                 answer = response["answer"]
                 st.markdown(answer)
                 citations = response.get("citations", [])
@@ -81,4 +81,3 @@ if st.session_state.last_activity:
     with st.expander("Agent activity and memory", expanded=False):
         for event in st.session_state.last_activity:
             st.markdown(f"**{event['node']}** · {event['status']} — {event.get('detail', '')}")
-

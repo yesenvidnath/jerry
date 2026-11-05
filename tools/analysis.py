@@ -19,8 +19,10 @@ def make_batches(items: list[dict[str, Any]], batch_size: int = 3, max_batches: 
     return [items[index:index + batch_size] for index in range(0, min(len(items), batch_size * max_batches), batch_size)]
 
 
-def analyze_batch(batch_number: int, passages: list[dict[str, Any]]) -> dict[str, Any]:
+def analyze_batch(batch_number: int, passages: list[dict[str, Any]], role: str = "Viewer") -> dict[str, Any]:
     """Extract bounded, explainable cause signals from a small passage batch."""
+    from tools.permissions import require_permission
+    require_permission(role, "python_analysis")
     cause_counts: Counter[str] = Counter()
     findings: list[str] = []
     citations: list[dict[str, str]] = []
