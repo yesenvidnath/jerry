@@ -78,3 +78,7 @@ curl -X POST http://127.0.0.1:8010/api/chat \
 ```
 
 Viewers can chat and search. Analysts can also run structured Python analysis and MCP-style employee/service tools. Administrators can use all tools, including `GET /api/tools/admin/index-status`. A Viewer request routed to multi-document analysis is safely denied with a visible authorization event; direct calls to protected analyst tools return HTTP 403. See [role permissions and endpoints](docs/rbac-tools.md).
+
+## Security and guardrails
+
+Requests and tool arguments are length/schema validated; retrieved chunks containing suspicious override, exfiltration, command, or permission-bypass patterns are dropped before LLM generation or analytics. Retrieved content and memory are labeled as untrusted in model instructions. Output length is bounded, key-like secret strings are redacted, and only citations matching retrieved document IDs are returned. Invalid citations are removed individually, with a cited extractive fallback when a factual answer has no valid citations. The detector uses simple phrase patterns and may miss novel attacks or flag benign text; see [guardrails and limits](docs/security-guardrails.md).

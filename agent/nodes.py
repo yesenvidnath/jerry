@@ -2,7 +2,6 @@
 
 import logging
 import os
-import re
 from typing import Any
 
 from agent.memory import contextualize_query, format_recent_history
@@ -12,9 +11,10 @@ from models.retrieval import RetrievalFilters
 from tools.knowledge_search import search_knowledge
 from tools.mcp_client import list_employees, list_services
 from tools.permissions import PermissionDenied
+from security.guardrails import inspect_untrusted_text, redact_unsafe_output, reject_unsafe_request, validate_citations as check_citations
+from security.validation import UnsafeInput, validate_retrieved_passages, validate_user_query
 
 logger = logging.getLogger(__name__)
-SOURCE_PATTERN = re.compile(r"\[source:([^\]]+)\]")
 
 
 def _event(state: dict[str, Any], node: str, status: str, detail: str = "") -> list[dict[str, str]]:
@@ -24,12 +24,15 @@ def _event(state: dict[str, Any], node: str, status: str, detail: str = "") -> l
 
 
 def validate_request(state: dict[str, Any]) -> dict[str, Any]:
-    query = str(state.get("query", "")).strip()
+    query = str(state.get("query", ""))
     events = _event(state, "validate_request", "complete")
-    if not query:
-        return {"query": "", "errors": ["Question is required."], "answer": "Please enter a question.", "activity": events}
-    if len(query) > 4000:
-        return {"errors": ["Question exceeds the 4,000 character limit."], "answer": "Please shorten your question.", "activity": events}
+    try:
+        query = validate_user_query(query)
+    except UnsafeInput as exc:
+        return {"query": query, "errors": [str(exc)], "answer": "Please enter a valid question without unsupported control characters.", "activity": _event(state, "validate_request", "rejected", str(exc))}
+    refusal = reject_unsafe_request(query)
+    if refusal:
+        return {"query": query, "errors": ["Request rejected by security guardrail."], "answer": refusal, "activity": _event(state, "guardrail", "blocked", "Unsafe request pattern detected")}
     return {"query": query, "activity": events, "errors": []}
 
 
@@ -47,9 +50,13 @@ async def retrieve(state: dict[str, Any]) -> dict[str, Any]:
         search_query = contextualize_query(state["query"], state.get("recent_history", []))
         results = await search_knowledge(search_query, state.get("role", "Viewer"), top_k=limit, filters=RetrievalFilters())
         serialized = [item.model_dump(mode="json") for item in results]
+        safe_passages, rejected = validate_retrieved_passages(serialized)
+        detail = f"Retrieved {len(safe_passages)} validated passages"
+        if rejected:
+            detail += f"; dropped {len(rejected)} unsafe or malformed passage(s)"
         return {
-            "retrieved": serialized,
-            "activity": _event(state, "retrieve", "complete", f"Retrieved {len(serialized)} passages using current question and recent context"),
+            "retrieved": safe_passages,
+            "activity": _event(state, "retrieve", "complete", detail),
         }
     except Exception as exc:
         logger.exception("retrieval_failed")
@@ -90,9 +97,13 @@ async def respond(state: dict[str, Any]) -> dict[str, Any]:
         return {"answer": answer, "activity": _event(state, "respond", "complete", "Returned safe no-evidence response")}
 
     evidence = "\n\n".join(
-        f"[source:{item['document_id']}] {item['title']}\n{item['passage']}"
+        f"<untrusted_evidence source_id=\"{item['document_id']}\" title=\"{item['title']}\">\n{item['passage']}\n</untrusted_evidence>"
         for item in passages[:8]
     )
+    safe_history = [
+        turn for turn in state.get("recent_history", [])
+        if not inspect_untrusted_text(str(turn.get("content", "")))
+    ]
     provider = os.getenv("LLM_PROVIDER", "local").lower()
     if provider == "openai":
         try:
@@ -102,7 +113,7 @@ async def respond(state: dict[str, Any]) -> dict[str, Any]:
                 ("system", SYSTEM_PROMPT),
                 ("human", USER_PROMPT.format(
                     query=state["query"], evidence=evidence,
-                    conversation_context=format_recent_history(state.get("recent_history", [])),
+                    conversation_context=format_recent_history(safe_history),
                 )),
             ])
             answer = str(message.content)
@@ -119,24 +130,31 @@ async def respond(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_citations(state: dict[str, Any]) -> dict[str, Any]:
-    allowed = {str(item.get("document_id")) for item in state.get("retrieved", [])}
-    used = set(SOURCE_PATTERN.findall(state.get("answer", "")))
-    invalid = used - allowed
-    answer = state.get("answer", "")
-    if invalid:
-        answer = re.sub(r"\s*\[source:[^\]]+\]", "", answer)
-        answer += "\n\nI could not validate one or more generated citations, so I removed them."
+    passages = state.get("retrieved", [])
+    answer = str(state.get("answer", ""))
+    answer, redacted = redact_unsafe_output(answer)
+    answer, used, invalid = check_citations(answer, passages)
+    if passages and not used and state.get("evidence_sufficient"):
+        answer = _fallback_answer(state.get("query", ""), passages)
+        answer, redacted = redact_unsafe_output(answer)
+        answer, used, invalid_again = check_citations(answer, passages)
+        invalid = invalid or invalid_again
     citations = []
     seen = set()
-    for item in state.get("retrieved", []):
+    for item in passages:
         doc_id = str(item.get("document_id", ""))
         if doc_id in used and doc_id not in seen:
             seen.add(doc_id)
             citations.append({"document_id": doc_id, "title": str(item.get("title", "")), "chunk_id": str(item.get("chunk_id", ""))})
+    detail = f"Validated {len(citations)} source(s)"
+    if invalid:
+        detail += "; removed invalid citations"
+    if redacted:
+        detail += "; redacted unsafe output or enforced output length limit"
     return {
         "answer": answer,
         "citations": citations,
-        "activity": _event(state, "validate_citations", "complete", f"Validated {len(citations)} source(s)"),
+        "activity": _event(state, "validate_citations", "complete", detail),
     }
 
 

@@ -7,6 +7,7 @@ from agent.memory import contextualize_query
 from models.analysis import AnalysisPlan
 from models.retrieval import RetrievalFilters
 from tools.knowledge_search import search_knowledge
+from security.validation import validate_retrieved_passages
 from tools.analysis import aggregate_findings, analyze_batch, make_batches
 
 
@@ -47,9 +48,12 @@ async def retrieve_analysis_documents(state: dict[str, Any]) -> dict[str, Any]:
     )
     try:
         retrieved = await search_knowledge(plan["topic_query"], state.get("role", "Viewer"), top_k=plan["batch_size"] * plan["max_batches"], filters=filters)
-        passages = [item.model_dump(mode="json") for item in retrieved]
+        raw_passages = [item.model_dump(mode="json") for item in retrieved]
+        passages, rejected = validate_retrieved_passages(raw_passages)
         errors = []
-        detail = f"Found {len(passages)} matching passages"
+        detail = f"Found {len(passages)} validated passages"
+        if rejected:
+            detail += f"; dropped {len(rejected)} unsafe or malformed passage(s)"
     except Exception as exc:
         passages, errors = [], [f"Analysis retrieval failed: {type(exc).__name__}"]
         detail = "Document search was unavailable"

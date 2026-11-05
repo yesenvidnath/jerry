@@ -31,9 +31,13 @@ async def chat(request: ChatRequest, user: DemoUser = Depends(get_current_user))
             "errors": [],
         })
         answer = result.get("answer", "I couldn't complete that request.")
-        turn_count = session_memory.append_exchange(
-            request.session_id, user.user_id, user.role, request.query, answer
-        )
+        rejected_request = any("Request rejected by security guardrail" in error for error in result.get("errors", []))
+        if rejected_request:
+            turn_count = len(history) // 2
+        else:
+            turn_count = session_memory.append_exchange(
+                request.session_id, user.user_id, user.role, request.query, answer
+            )
         activity = list(result.get("activity", []))
         activity.append({
             "node": "memory_update", "status": "complete",
