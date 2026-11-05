@@ -88,3 +88,9 @@ Requests and tool arguments are length/schema validated; retrieved chunks contai
 Authenticated chat and tools are limited per demo user by a configurable token bucket. Defaults allow a burst of 20 requests with 10 tokens refilled per minute. Configure `RATE_LIMIT_CAPACITY` and `RATE_LIMIT_REFILL_PER_MINUTE`; HTTP 429 responses include `Retry-After`. Health endpoints stay available.
 
 Configure downstream timeouts with `RETRIEVAL_TIMEOUT_SECONDS`, `LLM_TIMEOUT_SECONDS`, and `TOOL_TIMEOUT_SECONDS`. Retrieval and MCP-style failures produce safe messages, LLM failures fall back to cited extracts, and unexpected server errors expose a trace ID rather than a stack trace. See [resilience behavior and limits](docs/resilience.md).
+
+## LangSmith tracing and live activity panel
+
+To send traces, set `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT` in `.env`. Tracing stays off if the flag or key is missing, and the app continues to run. Each graph run is tagged with its resolved role, demo user, session, and trace ID; retrieval, analysis, and MCP-style tool calls are traced as child runs. Keep demo data synthetic when sending traces to LangSmith.
+
+The Streamlit chat now streams graph node updates live over `POST /api/chat/stream`, then shows the final answer, source list, and trace metadata. The ordinary `POST /api/chat` endpoint remains available. See [observability setup and event flow](docs/observability.md). The trace environment settings follow LangChain’s [official LangSmith setup](https://docs.langchain.com/oss/python/integrations/llms/openai).

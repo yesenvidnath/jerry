@@ -4,6 +4,7 @@ import json
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from collections.abc import Iterator
 
 
 def _auth_headers(token: str) -> dict[str, str]:
@@ -62,3 +63,23 @@ def call_tool(base_url: str, path: str, token: str, payload: dict | None = None,
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"API returned {exc.code}: {detail}") from exc
+
+def stream_chat(base_url: str, payload: dict, token: str, timeout: float = 120.0) -> Iterator[dict]:
+    """Yield activity events and the final response from the SSE chat endpoint."""
+    request = Request(
+        f"{base_url.rstrip('/')}/api/chat/stream",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={**_auth_headers(token), "Content-Type": "application/json", "Accept": "text/event-stream"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            for raw_line in response:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if line.startswith("data: "):
+                    yield json.loads(line[6:])
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"API returned {exc.code}: {detail}") from exc
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
+        raise RuntimeError(f"Could not complete the Jerry request: {exc}") from exc

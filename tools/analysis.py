@@ -1,4 +1,6 @@
 """Safe, bounded Python analysis over retrieved document passages."""
+from langsmith import traceable
+
 
 import re
 from collections import Counter
@@ -19,6 +21,7 @@ def make_batches(items: list[dict[str, Any]], batch_size: int = 3, max_batches: 
     return [items[index:index + batch_size] for index in range(0, min(len(items), batch_size * max_batches), batch_size)]
 
 
+@traceable(name="python_structured_analysis", run_type="tool")
 def analyze_batch(batch_number: int, passages: list[dict[str, Any]], role: str = "Viewer") -> dict[str, Any]:
     """Extract bounded, explainable cause signals from a small passage batch."""
     from tools.permissions import require_permission

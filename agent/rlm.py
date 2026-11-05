@@ -5,6 +5,7 @@ from typing import Any
 
 from agent.memory import contextualize_query
 from models.analysis import AnalysisPlan
+from observability.events import make_activity_event
 from models.retrieval import RetrievalFilters
 from tools.knowledge_search import search_knowledge
 from security.validation import validate_retrieved_passages
@@ -34,7 +35,7 @@ def plan_analysis(state: dict[str, Any]) -> dict[str, Any]:
         "max_batches": 4,
     }
     events = list(state.get("activity", []))
-    events.append({"node": "rlm_plan", "status": "complete", "detail": "Created a bounded incident search and batch plan"})
+    events.append(make_activity_event("rlm_plan", "complete", "Created a bounded incident search and batch plan"))
     return {"rlm_plan": plan, "activity": events}
 
 
@@ -58,7 +59,7 @@ async def retrieve_analysis_documents(state: dict[str, Any]) -> dict[str, Any]:
         passages, errors = [], [f"Analysis retrieval failed: {type(exc).__name__}"]
         detail = "Document search was unavailable"
     events = list(state.get("activity", []))
-    events.append({"node": "rlm_search", "status": "complete" if passages else "failed", "detail": detail})
+    events.append(make_activity_event("rlm_search", "complete" if passages else "failed", detail))
     return {"retrieved": passages, "errors": list(state.get("errors", [])) + errors, "activity": events}
 
 
@@ -68,12 +69,12 @@ def analyze_batches(state: dict[str, Any]) -> dict[str, Any]:
     results = [analyze_batch(index, batch, state.get("role", "Viewer")) for index, batch in enumerate(batches, start=1)]
     events = list(state.get("activity", []))
     for result in results:
-        events.append({
-            "node": "rlm_batch_analysis", "status": "complete",
-            "detail": f"Batch {result['batch_number']}: analyzed {result['passage_count']} passages across {len(result['documents_examined'])} documents",
-        })
+        events.append(make_activity_event(
+            "rlm_batch_analysis", "complete",
+            f"Batch {result['batch_number']}: analyzed {result['passage_count']} passages across {len(result['documents_examined'])} documents",
+        ))
     if not results:
-        events.append({"node": "rlm_batch_analysis", "status": "complete", "detail": "No matching passages to analyze"})
+        events.append(make_activity_event("rlm_batch_analysis", "complete", "No matching passages to analyze"))
     return {"batch_results": results, "activity": events}
 
 
@@ -97,7 +98,7 @@ def aggregate_analysis(state: dict[str, Any]) -> dict[str, Any]:
         lines.append(" ".join(f"[source:{doc_id}]" for doc_id in summary["documents_examined"]))
         answer = "\n".join(lines)
     events = list(state.get("activity", []))
-    events.append({"node": "rlm_aggregate", "status": "complete", "detail": f"Aggregated {len(state.get('batch_results', []))} bounded batch result(s)"})
+    events.append(make_activity_event("rlm_aggregate", "complete", f"Aggregated {len(state.get('batch_results', []))} bounded batch result(s)"))
     return {"analysis_summary": summary, "answer": answer, "citations": summary["citations"], "activity": events}
 
 
