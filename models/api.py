@@ -18,6 +18,7 @@ class ActivityEvent(BaseModel):
     node: str
     status: str
     detail: str = ""
+    timestamp: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -26,3 +27,6 @@ class ChatResponse(BaseModel):
     activity: list[ActivityEvent] = Field(default_factory=list)
     error: str | None = None
     memory_turns: int = 0
+    trace_id: str | None = None
+    tracing_enabled: bool = False
+    trace_project: str | None = None

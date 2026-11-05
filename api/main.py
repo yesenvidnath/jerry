@@ -13,6 +13,7 @@ from api.routes.health import router as health_router
 from api.routes.tools import router as tools_router
 from core.config import settings
 from core.logging import configure_logging, reset_trace_id, set_trace_id
+from observability.tracing import configure_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     configure_logging(settings.log_level)
+    tracing_enabled = configure_tracing()
     logger.info("application_started", extra={"environment": settings.app_env})
+    logger.info("langsmith_tracing_configured", extra={"environment": "enabled" if tracing_enabled else "disabled"})
     yield
     logger.info("application_stopped")
 

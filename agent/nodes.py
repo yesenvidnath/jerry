@@ -14,13 +14,14 @@ from tools.mcp_client import list_employees, list_services
 from tools.permissions import PermissionDenied
 from security.guardrails import inspect_untrusted_text, redact_unsafe_output, reject_unsafe_request, validate_citations as check_citations
 from security.validation import UnsafeInput, validate_retrieved_passages, validate_user_query
+from observability.events import make_activity_event
 
 logger = logging.getLogger(__name__)
 
 
 def _event(state: dict[str, Any], node: str, status: str, detail: str = "") -> list[dict[str, str]]:
     events = list(state.get("activity", []))
-    events.append({"node": node, "status": status, "detail": detail})
+    events.append(make_activity_event(node, status, detail))
     return events
 
 

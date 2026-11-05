@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from agent.nodes import check_evidence, deny_analysis, deny_mcp, invoke_mcp_tool, respond, retrieve, supervisor, validate_citations, validate_request
 from agent.rlm import aggregate_analysis, analyze_batches, plan_analysis, retrieve_analysis_documents
 from models.state import AssistantState
+from observability.events import make_activity_event
 
 
 def _after_validation(state: AssistantState) -> str:
@@ -34,9 +35,9 @@ def _after_evidence(state: AssistantState) -> str:
 def _retry_retrieval(state: AssistantState) -> dict[str, Any]:
     return {
         "retry_count": state.get("retry_count", 0) + 1,
-        "activity": list(state.get("activity", [])) + [{
-            "node": "retry_retrieval", "status": "complete", "detail": "One bounded wider search retry"
-        }],
+        "activity": list(state.get("activity", [])) + [
+            make_activity_event("retry_retrieval", "complete", "One bounded wider search retry")
+        ],
     }
 
 

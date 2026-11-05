@@ -13,3 +13,6 @@ pinecone>=5.0,<8.0
 # Agent orchestration and optional hosted chat model
 langgraph>=0.2,<1.0
 langchain-openai>=0.2,<2.0
+
+# LangSmith observability
+langsmith>=0.1,<1.0
