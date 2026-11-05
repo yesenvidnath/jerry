@@ -37,6 +37,8 @@ async def analyze(request: AnalysisToolRequest, user: DemoUser = Depends(get_cur
         return result
     except PermissionDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/employees")

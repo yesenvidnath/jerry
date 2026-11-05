@@ -23,6 +23,10 @@ def analyze_batch(batch_number: int, passages: list[dict[str, Any]], role: str =
     """Extract bounded, explainable cause signals from a small passage batch."""
     from tools.permissions import require_permission
     require_permission(role, "python_analysis")
+    from security.validation import validate_retrieved_passages
+    passages, rejected = validate_retrieved_passages(passages, max_passages=12)
+    if rejected:
+        raise ValueError("Analysis input contains unsafe or malformed passages.")
     cause_counts: Counter[str] = Counter()
     findings: list[str] = []
     citations: list[dict[str, str]] = []
