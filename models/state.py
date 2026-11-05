@@ -16,3 +16,6 @@ class AssistantState(TypedDict, total=False):
     errors: list[str]
     retry_count: int
     max_retries: int
+    rlm_plan: dict[str, Any]
+    batch_results: list[dict[str, Any]]
+    analysis_summary: dict[str, Any]

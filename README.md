@@ -53,3 +53,9 @@ The FastAPI chat endpoint is `POST http://127.0.0.1:8010/api/chat`. A minimal re
 The LangGraph workflow validates the request, classifies intent, retrieves evidence, checks support, performs at most one wider retrieval retry, generates a grounded answer, and validates citations against retrieved document IDs. The API returns the answer, citations, activity events, and a safe error summary. You can try it at `http://127.0.0.1:8010/docs`.
 
 By default `LLM_PROVIDER=local` returns cited excerpts from the retrieved material without requiring an LLM key. Set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` to use the configured chat model. If that provider fails, the graph records the failure and falls back to extractive cited output. The local answer is intentionally extractive; it is not presented as a model-generated synthesis.
+
+## Recursive analysis (RLM-style)
+
+Analysis-shaped questions such as “Summarize payment failure incidents from last year and identify recurring root causes” route into a separate LangGraph path. The path builds an explicit Python analysis plan, searches only incident reports with relevant metadata filters, splits the retrieved passages into batches of at most 3, processes no more than 4 batches, and aggregates cause signals with supporting source IDs. The activity list shows planning, search, each batch, and aggregation. “Last year” means the previous calendar year; “past year” means the trailing 365 days.
+
+This is a bounded RLM demonstration: targeted retrieval and Python-controlled subtask/batch analysis avoid loading the whole corpus into an LLM prompt. Cause categories use transparent Python phrase patterns rather than an LLM judgment, and the answer states that limitation. Current sample reports are dated in 2025; if asked for the past 365 days in 2026, a no-results answer is expected. The previous calendar year 2025 query will match the included samples.
