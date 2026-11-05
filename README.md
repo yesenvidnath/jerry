@@ -1,44 +1,41 @@
 # Jerry
 
-Jerry is an enterprise knowledge assistant built in ordered feature stages. This branch implements the **project foundation**: FastAPI health service, Streamlit connectivity page, environment configuration, JSON logs, and sample company documents.
+Jerry is an enterprise knowledge assistant built in ordered feature stages. This branch implements **document ingestion and data modeling** on top of the project foundation.
 
-## Requirements
+## Requirements and setup
 
 - Python 3.11 or newer
-- pip
+- Install dependencies: `python -m pip install -r requirements.txt`
+- Copy `.env.example` to `.env` and set credentials only for optional hosted services.
 
-## Setup
+## Run the API and UI
 
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-Copy-Item .env.example .env
-```
-
-## Run
-
-Start the API in one terminal:
+API (port 8010):
 
 ```powershell
 uvicorn api.main:app --reload --host 127.0.0.1 --port 8010
 ```
 
-Open `http://127.0.0.1:8010/health` or the interactive API docs at `http://127.0.0.1:8010/docs`.
-
-Start the UI in another terminal:
+Streamlit (second terminal):
 
 ```powershell
 streamlit run ui/streamlit_app.py
 ```
 
-Use **Check backend** in the page to call the API health endpoint. Set `API_BASE_URL` in `.env` if the API runs at another address. The app reads `.env` automatically when started with the setup above (via `python-dotenv`/Streamlit environment loading as later stages are added); environment variables can also be set directly in the shell.
+## Ingest the sample documents
 
-## Sample knowledge documents
+The default local mode requires no API keys and writes chunk records and reproducible local feature-hash vectors to `data/local_index.jsonl`:
 
-`data/sample_docs/` contains fictional payments incident reports, an operational runbook, a security policy, and architecture notes for upcoming ingestion and retrieval work. They are synthetic demo content.
+```powershell
+python scripts/ingest_sample_data.py
+```
 
-## Architecture and roadmap
+To send vectors to Pinecone, configure `PINECONE_API_KEY`, `PINECONE_INDEX`, and `PINECONE_NAMESPACE`, choose an embedding provider compatible with the index dimension, then run:
 
-See [architecture](docs/architecture.md) and [development flow](docs/development-flow.md). API endpoints are asynchronous; structured JSON logs go to stdout. No model, Pinecone, or LangSmith credentials are required for this foundation stage.
+```powershell
+python scripts/ingest_sample_data.py --backend pinecone
+```
 
+The default local hash embeddings are a dependency-free demonstration vectorizer, **not semantic embeddings**. For production-style vectors, set `EMBEDDING_PROVIDER=openai`, provide `OPENAI_API_KEY`, and install the optional OpenAI SDK listed in `requirements.txt`. Create a Pinecone index whose dimension matches the selected embedding model before ingestion. Pinecone integration is optional and is not considered configured until these steps succeed.
+
+Chunk metadata preserves document ID, title, chunk index, department, document type, access level, and creation date for citation and future retrieval filters. Sample documents are fictional.
