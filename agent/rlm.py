@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 from typing import Any
 
+from agent.memory import contextualize_query
 from models.analysis import AnalysisPlan
 from models.retrieval import RetrievalFilters
 from retrieval.hybrid import aretrieve
@@ -23,7 +24,7 @@ def plan_analysis(state: dict[str, Any]) -> dict[str, Any]:
         created_after = created_before = None
     department = "payments" if "payment" in normalized else None
     plan: AnalysisPlan = {
-        "topic_query": query,
+        "topic_query": contextualize_query(query, state.get("recent_history", [])),
         "document_type": "incident report",
         "department": department,
         "created_after": created_after.isoformat() if created_after else None,
@@ -94,3 +95,6 @@ def aggregate_analysis(state: dict[str, Any]) -> dict[str, Any]:
     events = list(state.get("activity", []))
     events.append({"node": "rlm_aggregate", "status": "complete", "detail": f"Aggregated {len(state.get('batch_results', []))} bounded batch result(s)"})
     return {"analysis_summary": summary, "answer": answer, "citations": summary["citations"], "activity": events}
+
+
+

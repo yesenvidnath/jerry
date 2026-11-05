@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     session_id: str = Field(default="demo", min_length=1, max_length=120)
+    user_id: str = Field(default="demo", min_length=1, max_length=120)
     role: Literal["Viewer", "Analyst", "Administrator"] = "Viewer"
 
 
@@ -24,6 +25,7 @@ class ActivityEvent(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
-    citations: list[Citation] = []
-    activity: list[ActivityEvent] = []
+    citations: list[Citation] = Field(default_factory=list)
+    activity: list[ActivityEvent] = Field(default_factory=list)
     error: str | None = None
+    memory_turns: int = 0
