@@ -1,5 +1,10 @@
 """Protected tool endpoints for search, analysis, and dummy MCP data."""
 
+from api.dependencies import enforce_rate_limit
+from core.config import settings
+from core.errors import DownstreamServiceError
+import asyncio
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,7 +18,8 @@ from tools.knowledge_search import search_knowledge
 from tools.mcp_client import list_employees, list_services
 from tools.permissions import PermissionDenied, require_permission
 
-router = APIRouter(prefix="/api/tools", tags=["tools"])
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/tools", tags=["tools"], dependencies=[Depends(enforce_rate_limit)])
 
 
 @router.post("/search")
@@ -26,6 +32,9 @@ async def search(request: SearchToolRequest, user: DemoUser = Depends(get_curren
         return {"results": [result.model_dump(mode="json") for result in results]}
     except PermissionDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except DownstreamServiceError as exc:
+        logger.exception("knowledge_search_tool_failed")
+        raise HTTPException(status_code=503, detail=exc.public_message) from exc
 
 
 @router.post("/analysis")
@@ -44,17 +53,29 @@ async def analyze(request: AnalysisToolRequest, user: DemoUser = Depends(get_cur
 @router.get("/employees")
 async def employees(user: DemoUser = Depends(get_current_user)):
     try:
-        return {"employees": list_employees(user.role)}
+        records = await asyncio.wait_for(asyncio.to_thread(list_employees, user.role), timeout=settings.tool_timeout_seconds)
+        return {"employees": records}
     except PermissionDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Employee directory timed out. Please retry.") from exc
+    except Exception as exc:
+        logger.exception("employee_tool_failed")
+        raise HTTPException(status_code=503, detail="Employee directory is temporarily unavailable.") from exc
 
 
 @router.get("/services")
 async def services(user: DemoUser = Depends(get_current_user)):
     try:
-        return {"services": list_services(user.role)}
+        records = await asyncio.wait_for(asyncio.to_thread(list_services, user.role), timeout=settings.tool_timeout_seconds)
+        return {"services": records}
     except PermissionDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Service catalog timed out. Please retry.") from exc
+    except Exception as exc:
+        logger.exception("service_tool_failed")
+        raise HTTPException(status_code=503, detail="Service catalog is temporarily unavailable.") from exc
 
 
 @router.get("/admin/index-status")

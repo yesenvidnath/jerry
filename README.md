@@ -82,3 +82,9 @@ Viewers can chat and search. Analysts can also run structured Python analysis an
 ## Security and guardrails
 
 Requests and tool arguments are length/schema validated; retrieved chunks containing suspicious override, exfiltration, command, or permission-bypass patterns are dropped before LLM generation or analytics. Retrieved content and memory are labeled as untrusted in model instructions. Output length is bounded, key-like secret strings are redacted, and only citations matching retrieved document IDs are returned. Invalid citations are removed individually, with a cited extractive fallback when a factual answer has no valid citations. The detector uses simple phrase patterns and may miss novel attacks or flag benign text; see [guardrails and limits](docs/security-guardrails.md).
+
+## Rate limits and graceful errors
+
+Authenticated chat and tools are limited per demo user by a configurable token bucket. Defaults allow a burst of 20 requests with 10 tokens refilled per minute. Configure `RATE_LIMIT_CAPACITY` and `RATE_LIMIT_REFILL_PER_MINUTE`; HTTP 429 responses include `Retry-After`. Health endpoints stay available.
+
+Configure downstream timeouts with `RETRIEVAL_TIMEOUT_SECONDS`, `LLM_TIMEOUT_SECONDS`, and `TOOL_TIMEOUT_SECONDS`. Retrieval and MCP-style failures produce safe messages, LLM failures fall back to cited extracts, and unexpected server errors expose a trace ID rather than a stack trace. See [resilience behavior and limits](docs/resilience.md).

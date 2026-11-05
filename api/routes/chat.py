@@ -1,5 +1,6 @@
 """Chat endpoint invoking LangGraph with role-bound per-session memory."""
 
+from api.dependencies import enforce_rate_limit
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,7 +12,7 @@ from security.auth import DemoUser, get_current_user
 from tools.permissions import PermissionDenied, require_permission
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["chat"])
+router = APIRouter(prefix="/api", tags=["chat"], dependencies=[Depends(enforce_rate_limit)])
 
 
 @router.post("/chat", response_model=ChatResponse)

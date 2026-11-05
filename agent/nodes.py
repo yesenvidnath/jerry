@@ -5,6 +5,7 @@ import os
 from typing import Any
 
 from agent.memory import contextualize_query, format_recent_history
+from core.config import settings
 from agent.prompts import SYSTEM_PROMPT, USER_PROMPT
 from agent.routing import route_request
 from models.retrieval import RetrievalFilters
@@ -108,7 +109,7 @@ async def respond(state: dict[str, Any]) -> dict[str, Any]:
     if provider == "openai":
         try:
             from langchain_openai import ChatOpenAI
-            model = ChatOpenAI(model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini"), temperature=0)
+            model = ChatOpenAI(model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini"), temperature=0, timeout=settings.llm_timeout_seconds)
             message = await model.ainvoke([
                 ("system", SYSTEM_PROMPT),
                 ("human", USER_PROMPT.format(
@@ -163,12 +164,12 @@ async def invoke_mcp_tool(state: dict[str, Any]) -> dict[str, Any]:
     route = state.get("route")
     try:
         if route == "mcp_employees":
-            records = await asyncio.to_thread(list_employees, state.get("role", "Viewer"))
+            records = await asyncio.wait_for(asyncio.to_thread(list_employees, state.get("role", "Viewer")), timeout=settings.tool_timeout_seconds)
             lines = [f"- {person['name']} — {person['title']} ({person['department']})" for person in records]
             answer = "Employee directory results:\n" + "\n".join(lines)
             detail = f"Retrieved {len(records)} employee record(s)"
         else:
-            records = await asyncio.to_thread(list_services, state.get("role", "Viewer"))
+            records = await asyncio.wait_for(asyncio.to_thread(list_services, state.get("role", "Viewer")), timeout=settings.tool_timeout_seconds)
             lines = [f"- {item['name']} — owner: {item['owner']}; tier: {item['tier']}" for item in records]
             answer = "Service catalog results:\n" + "\n".join(lines)
             detail = f"Retrieved {len(records)} service record(s)"
@@ -178,6 +179,19 @@ async def invoke_mcp_tool(state: dict[str, Any]) -> dict[str, Any]:
             "answer": "This request needs the Analyst role or Administrator role to use the enterprise data tool.",
             "errors": list(state.get("errors", [])) + [str(exc)],
             "activity": _event(state, "authorize_tool", "denied", str(exc)),
+        }
+    except TimeoutError:
+        return {
+            "answer": "The enterprise data tool timed out. Please try again shortly.",
+            "errors": list(state.get("errors", [])) + ["MCP tool timeout"],
+            "activity": _event(state, "mcp_tool", "failed", "Tool execution exceeded its configured timeout"),
+        }
+    except Exception as exc:
+        logger.exception("mcp_tool_failed")
+        return {
+            "answer": "The enterprise data tool is temporarily unavailable.",
+            "errors": list(state.get("errors", [])) + [f"MCP tool failed: {type(exc).__name__}"],
+            "activity": _event(state, "mcp_tool", "failed", "Tool execution failed safely"),
         }
 
 
