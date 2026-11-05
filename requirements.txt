@@ -1,0 +1,7 @@
+# Runtime
+fastapi
+uvicorn[standard]
+streamlit
+pydantic
+pydantic-settings
+python-dotenv
