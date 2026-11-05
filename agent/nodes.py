@@ -5,6 +5,7 @@ import os
 import re
 from typing import Any
 
+from agent.memory import contextualize_query, format_recent_history
 from agent.prompts import SYSTEM_PROMPT, USER_PROMPT
 from agent.routing import route_request
 from models.retrieval import RetrievalFilters
@@ -32,17 +33,21 @@ def validate_request(state: dict[str, Any]) -> dict[str, Any]:
 
 def supervisor(state: dict[str, Any]) -> dict[str, Any]:
     route = route_request(state["query"])
-    return {"route": route, "activity": _event(state, "supervisor", "complete", f"Selected {route}")}
+    detail = f"Selected {route}"
+    if state.get("recent_history"):
+        detail += f"; using {len(state['recent_history'])} recent memory turn(s)"
+    return {"route": route, "activity": _event(state, "supervisor", "complete", detail)}
 
 
 async def retrieve(state: dict[str, Any]) -> dict[str, Any]:
     try:
         limit = 5 if state.get("retry_count", 0) == 0 else 10
-        results = await aretrieve(state["query"], top_k=limit, filters=RetrievalFilters())
+        search_query = contextualize_query(state["query"], state.get("recent_history", []))
+        results = await aretrieve(search_query, top_k=limit, filters=RetrievalFilters())
         serialized = [item.model_dump(mode="json") for item in results]
         return {
             "retrieved": serialized,
-            "activity": _event(state, "retrieve", "complete", f"Retrieved {len(serialized)} passages"),
+            "activity": _event(state, "retrieve", "complete", f"Retrieved {len(serialized)} passages using current question and recent context"),
         }
     except Exception as exc:
         logger.exception("retrieval_failed")
@@ -93,7 +98,10 @@ async def respond(state: dict[str, Any]) -> dict[str, Any]:
             model = ChatOpenAI(model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini"), temperature=0)
             message = await model.ainvoke([
                 ("system", SYSTEM_PROMPT),
-                ("human", USER_PROMPT.format(query=state["query"], evidence=evidence)),
+                ("human", USER_PROMPT.format(
+                    query=state["query"], evidence=evidence,
+                    conversation_context=format_recent_history(state.get("recent_history", [])),
+                )),
             ])
             answer = str(message.content)
         except Exception as exc:
