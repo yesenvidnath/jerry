@@ -5,3 +5,7 @@ streamlit>=1.39,<2.0
 pydantic>=2.8,<3.0
 pydantic-settings>=2.4,<3.0
 python-dotenv>=1.0,<2.0
+
+# Optional hosted embedding and vector storage adapters
+openai>=1.40,<2.0
+pinecone>=5.0,<8.0
