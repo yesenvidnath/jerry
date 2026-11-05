@@ -41,3 +41,15 @@ The default local hash embeddings are a dependency-free demonstration vectorizer
 Chunk metadata preserves document ID, title, chunk index, department, document type, access level, and creation date for citation and future retrieval filters. Sample documents are fictional.
 
 VECTOR_BACKEND=local
+
+## Chat assistant (stage 4)
+
+The FastAPI chat endpoint is `POST http://127.0.0.1:8010/api/chat`. A minimal request body is:
+
+```json
+{"query":"What caused the settlement delay?","session_id":"demo","role":"Viewer"}
+```
+
+The LangGraph workflow validates the request, classifies intent, retrieves evidence, checks support, performs at most one wider retrieval retry, generates a grounded answer, and validates citations against retrieved document IDs. The API returns the answer, citations, activity events, and a safe error summary. You can try it at `http://127.0.0.1:8010/docs`.
+
+By default `LLM_PROVIDER=local` returns cited excerpts from the retrieved material without requiring an LLM key. Set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` to use the configured chat model. If that provider fails, the graph records the failure and falls back to extractive cited output. The local answer is intentionally extractive; it is not presented as a model-generated synthesis.
