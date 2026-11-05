@@ -9,7 +9,9 @@ from agent.memory import contextualize_query, format_recent_history
 from agent.prompts import SYSTEM_PROMPT, USER_PROMPT
 from agent.routing import route_request
 from models.retrieval import RetrievalFilters
-from retrieval.hybrid import aretrieve
+from tools.knowledge_search import search_knowledge
+from tools.mcp_client import list_employees, list_services
+from tools.permissions import PermissionDenied
 
 logger = logging.getLogger(__name__)
 SOURCE_PATTERN = re.compile(r"\[source:([^\]]+)\]")
@@ -43,7 +45,7 @@ async def retrieve(state: dict[str, Any]) -> dict[str, Any]:
     try:
         limit = 5 if state.get("retry_count", 0) == 0 else 10
         search_query = contextualize_query(state["query"], state.get("recent_history", []))
-        results = await aretrieve(search_query, top_k=limit, filters=RetrievalFilters())
+        results = await search_knowledge(search_query, state.get("role", "Viewer"), top_k=limit, filters=RetrievalFilters())
         serialized = [item.model_dump(mode="json") for item in results]
         return {
             "retrieved": serialized,
@@ -135,4 +137,44 @@ def validate_citations(state: dict[str, Any]) -> dict[str, Any]:
         "answer": answer,
         "citations": citations,
         "activity": _event(state, "validate_citations", "complete", f"Validated {len(citations)} source(s)"),
+    }
+
+
+async def invoke_mcp_tool(state: dict[str, Any]) -> dict[str, Any]:
+    import asyncio
+    route = state.get("route")
+    try:
+        if route == "mcp_employees":
+            records = await asyncio.to_thread(list_employees, state.get("role", "Viewer"))
+            lines = [f"- {person['name']} — {person['title']} ({person['department']})" for person in records]
+            answer = "Employee directory results:\n" + "\n".join(lines)
+            detail = f"Retrieved {len(records)} employee record(s)"
+        else:
+            records = await asyncio.to_thread(list_services, state.get("role", "Viewer"))
+            lines = [f"- {item['name']} — owner: {item['owner']}; tier: {item['tier']}" for item in records]
+            answer = "Service catalog results:\n" + "\n".join(lines)
+            detail = f"Retrieved {len(records)} service record(s)"
+        return {"tool_results": records, "answer": answer, "activity": _event(state, "mcp_tool", "complete", detail)}
+    except PermissionDenied as exc:
+        return {
+            "answer": "This request needs the Analyst role or Administrator role to use the enterprise data tool.",
+            "errors": list(state.get("errors", [])) + [str(exc)],
+            "activity": _event(state, "authorize_tool", "denied", str(exc)),
+        }
+
+
+
+def deny_mcp(state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "answer": "This enterprise directory/catalog tool requires the Analyst role or Administrator role.",
+        "errors": list(state.get("errors", [])) + ["Permission denied: mcp_tools"],
+        "activity": _event(state, "authorize_tool", "denied", "Viewer cannot run MCP tools"),
+    }
+
+def deny_analysis(state: dict[str, Any]) -> dict[str, Any]:
+    answer = "This request needs the Analyst role because it runs the Python analysis tool. You can still ask a regular knowledge-search question."
+    return {
+        "answer": answer,
+        "errors": list(state.get("errors", [])) + ["Permission denied: python_analysis"],
+        "activity": _event(state, "authorize_tool", "denied", "Viewer cannot run analytics tools"),
     }
