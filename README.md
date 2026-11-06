@@ -1,6 +1,115 @@
 # Jerry
 
-Jerry is an enterprise knowledge assistant built in ordered feature stages. This branch implements **document ingestion and data modeling** on top of the project foundation.
+Jerry is an enterprise knowledge assistant for asking questions about internal policies, incidents, runbooks, and architecture. It combines a Streamlit chat interface with a FastAPI service, a LangGraph workflow, searchable document sources, role-checked tools, and optional observability and hosted providers.
+
+## Architecture
+
+The diagram below shows the main request path and the supporting document, tool, and observability components. The repository root contains the Python packages; the project does not place them under an `app/` directory.
+
+![Jerry application architecture](docs/img/architecture.svg)
+
+For the design notes, see [docs/architecture.md](docs/architecture.md).
+
+## Git branch workflow
+
+Feature branches flow into `features`, then into `testing` for verification, and finally into `production`. `main` is the repository's default branch. The older `Proction` branch is shown as a legacy branch and is not part of this workflow.
+
+![Jerry Git branch workflow](docs/img/branch-workflow.svg)
+
+## Testing completion
+
+The local testing record reports all 10 feature areas and the Streamlit UI check passing: 11 checks passed, 0 failed. This covers local services and sample data; external Pinecone, hosted embedding, MCP, and LangSmith trace delivery were not tested in that run. See the full [testing record](docs/testing.md) for test details and repeat steps.
+
+![Jerry testing completion table: 11 checks passed and 0 failed](docs/img/testings/testing-results.png)
+
+## User manual: run and use Jerry
+
+### 1. Install and prepare
+
+Run these commands from the repository root in PowerShell. Python 3.11 or newer is required.
+
+```powershell
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+The included sample documents can run with the local providers and demo accounts; hosted API keys are optional. Build or refresh the local document index before asking questions:
+
+```powershell
+python scripts/ingest_sample_data.py
+```
+
+The command reports how many documents and chunks were indexed. It writes the local index to `data/local_index.jsonl`.
+
+### 2. Start Jerry
+
+Open two PowerShell terminals at the repository root. Start the API in the first terminal:
+
+```powershell
+uvicorn api.main:app --reload --host 127.0.0.1 --port 8010
+```
+
+Start the chat interface in the second terminal:
+
+```powershell
+streamlit run ui/streamlit_app.py --server.port 8501
+```
+
+Open [http://127.0.0.1:8501](http://127.0.0.1:8501) in a browser. The API health check is at [http://127.0.0.1:8010/health](http://127.0.0.1:8010/health), and interactive API documentation is at [http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs).
+
+### 3. Choose a demo account and ask a question
+
+In the left sidebar, select a demo account. The supplied demo token is filled in automatically and masked. Ask about the indexed sample documents in the chat box and press Enter. For example:
+
+- “What are the policies?”
+- “What caused the settlement delay?”
+- “What does the payments runbook say about latency?”
+
+Jerry responds from the indexed material when it finds supporting evidence and lists source citations under **Sources**. If it cannot find evidence, it says so instead of inventing an answer. Expand **Agent activity and observability** to inspect the workflow steps. The screenshots below show the main parts of the interface and its local health check. They are focused crops of the genuine app screenshots supplied during development; the activity and no-evidence examples are from an earlier local run. For a supported sample question after indexing, Jerry should return citations instead of the no-evidence response shown in that historical example.
+
+**Chat and question entry**
+
+![Jerry chat title and submitted sample question](docs/img/appsnapshots/01-jerry-chat-controls.png)
+
+**Demo account selector and backend URL**
+
+![Demo session sidebar with backend URL, demo account, and masked access token](docs/img/appsnapshots/02-demo-session-sidebar.png)
+
+**Agent activity panel**
+
+![Expanded agent activity panel showing the workflow steps](docs/img/appsnapshots/03-agent-activity-panel.png)
+
+**No-evidence response example**
+
+![Jerry safely reports that the current query has no supporting indexed evidence](docs/img/appsnapshots/04-no-evidence-response.png)
+
+**API health check**
+
+![FastAPI root status showing Jerry running and linking to health and API docs](docs/img/appsnapshots/05-api-health-check.png)
+
+### 4. Demo roles
+
+| Account | Capabilities |
+| --- | --- |
+| `viewer_demo` | Chat and knowledge search. Cannot call analysis, MCP-style, or administrative tools. |
+| `analyst_demo` | Viewer capabilities plus structured analysis and the local employee/service tools. |
+| `admin_demo` | All demo tools, including the administrative index-status endpoint. |
+
+These are demo identities selected in the sidebar, not a production sign-in system. The API checks the demo token and resolves the role server-side. A forbidden tool call returns HTTP 403; select an account with the required capability to use that tool.
+
+### 5. Continue or clear a conversation
+
+Jerry keeps up to three recent exchanges in memory for the current user and session, which can help it understand short follow-up questions. Select **Clear conversation memory** in the sidebar to start a fresh conversation. Memory is in-process and resets when the API restarts.
+
+### Troubleshooting
+
+- **The page cannot connect:** keep both terminal processes running. Check `http://127.0.0.1:8010/health` and confirm the chat sidebar's Backend URL is `http://127.0.0.1:8010`.
+- **No relevant documents are found:** run `python scripts/ingest_sample_data.py` from the repository root, then retry with one of the sample questions above. The default local index is used unless another vector backend is configured.
+- **`ModuleNotFoundError` when starting Streamlit:** run `streamlit run ui/streamlit_app.py` from the repository root so the project packages are on the import path.
+- **HTTP 429:** the demo account has reached its request limit; wait briefly and try again.
+- **LangSmith is not shown as enabled:** tracing is optional. Configure `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT` in `.env` if you want traces sent to LangSmith. Keep API keys private.
+
+Use synthetic or sample information with the demo. Do not treat the demo tokens or role selector as production authentication.
 
 ## Requirements and setup
 
