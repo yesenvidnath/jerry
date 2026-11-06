@@ -1,5 +1,9 @@
 # Jerry
 
+![Animated Jerry user interface tour](docs/img/appsnapshots/jerry-quick-tour.gif)
+
+*Animated montage of actual UI screenshots. The sample response screens show an earlier local run; answer text depends on the indexed documents.*
+
 Jerry is an enterprise knowledge assistant for asking questions about internal policies, incidents, runbooks, and architecture. It combines a Streamlit chat interface with a FastAPI service, a LangGraph workflow, searchable document sources, role-checked tools, and optional observability and hosted providers.
 
 ## Architecture
