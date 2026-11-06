@@ -9,10 +9,25 @@ from retrieval.ingest import load_documents
 from retrieval.chunking import chunk_document
 
 TOKEN_RE = re.compile(r"[a-z0-9_]+", re.IGNORECASE)
+STOPWORDS = {
+    "a", "an", "and", "are", "about", "can", "could", "do", "does", "for",
+    "from", "how", "i", "in", "is", "it", "me", "of", "on", "or", "please",
+    "say", "tell", "that", "the", "to", "was", "were", "what", "when", "where",
+    "which", "who", "why", "with",
+}
+
+
+def _normalize_token(token: str) -> str:
+    """Apply a small English plural normalizer for demo BM25 matching."""
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 3 and token.endswith("s") and not token.endswith(("ss", "us", "is")):
+        return token[:-1]
+    return token
 
 
 def tokens(text: str) -> list[str]:
-    return TOKEN_RE.findall(text.lower())
+    return [_normalize_token(token) for token in TOKEN_RE.findall(text.lower())]
 
 
 def _matches(metadata: dict, filters: RetrievalFilters | None) -> bool:
@@ -39,7 +54,7 @@ def sparse_search(
     documents = load_documents()
     chunks = [chunk for doc in documents for chunk in chunk_document(doc)]
     corpus = [tokens(chunk.text) for chunk in chunks]
-    query_terms = set(tokens(query))
+    query_terms = set(tokens(query)) - STOPWORDS
     if not query_terms:
         return []
     average_length = sum(map(len, corpus)) / max(len(corpus), 1)
