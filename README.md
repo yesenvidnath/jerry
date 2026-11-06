@@ -14,6 +14,8 @@ The diagram below shows the main request path and the supporting document, tool,
 
 For the design notes, see [docs/architecture.md](docs/architecture.md).
 
+The complete [LaTeX software documentation](docs/jerry-software-documentation.tex) includes a linked contents page, architecture and branch diagrams, user instructions, API/configuration references, safeguards, and test results. Compile it twice from the repository root with `pdflatex` to generate the PDF and resolve the table of contents.
+
 ## Git branch workflow
 
 Feature branches flow into `features`, then into `testing` for verification, and finally into `production`. `main` is the repository's default branch. The older `Proction` branch is shown as a legacy branch and is not part of this workflow.
@@ -22,7 +24,7 @@ Feature branches flow into `features`, then into `testing` for verification, and
 
 ## Testing completion
 
-The local testing record reports all 10 feature areas and the Streamlit UI check passing: 11 checks passed, 0 failed. This covers local services and sample data; external Pinecone, hosted embedding, MCP, and LangSmith trace delivery were not tested in that run. See the full [testing record](docs/testing.md) for test details and repeat steps.
+The local testing record reports all 10 feature areas and the Streamlit UI check passing: 11 checks passed, 0 failed. This covers local services and sample data; external Pinecone, hosted embedding, MCP, and LangSmith trace delivery were not tested in that run. See the full [testing record](docs/testing/testing.md) for test details and repeat steps, including direct role-by-role endpoint results.
 
 ![Jerry testing completion table: 11 checks passed and 0 failed](docs/img/testings/testing-results.png)
 
@@ -155,12 +157,12 @@ Chunk metadata preserves document ID, title, chunk index, department, document t
 
 VECTOR_BACKEND=local
 
-## Chat assistant (stage 4)
+## Chat assistant
 
 The FastAPI chat endpoint is `POST http://127.0.0.1:8010/api/chat`. A minimal request body is:
 
 ```json
-{"query":"What caused the settlement delay?","session_id":"demo","role":"Viewer"}
+{"query":"What caused the settlement delay?","session_id":"demo"}
 ```
 
 The LangGraph workflow validates the request, classifies intent, retrieves evidence, checks support, performs at most one wider retrieval retry, generates a grounded answer, and validates citations against retrieved document IDs. The API returns the answer, citations, activity events, and a safe error summary. You can try it at `http://127.0.0.1:8010/docs`.
@@ -177,7 +179,7 @@ This is a bounded RLM demonstration: targeted retrieval and Python-controlled su
 
 Chat now runs through the Streamlit interface and `POST /api/chat`. Each UI session gets a unique session ID and carries the demo user ID and selected role to the backend. The API stores up to the 3 most recent exchanges per session in bounded process memory (up to 1,000 sessions). Recent user questions can clarify short follow-ups; previous assistant text is context only and retrieved documents remain the source of facts. OpenAI prompts receive a small conversation window with that same rule. Use **Clear conversation memory** to start a fresh session.
 
-This demo memory is in-process and is cleared when the API restarts; it is not durable across deployments or shared across multiple workers. The API binds a session to the first user ID and role that uses it and rejects a change for that session. The current role/user fields are demo inputs, not authenticated identity; the RBAC stage will replace them with server-verified identity.
+This demo memory is in-process and is cleared when the API restarts; it is not durable across deployments or shared across multiple workers. The API binds a session to the user and role resolved from the server-validated demo token and rejects a conflicting identity. Demo tokens are not a production identity provider.
 
 ## Tools and role-based access
 
@@ -190,7 +192,7 @@ curl -X POST http://127.0.0.1:8010/api/chat \
   -d '{"query":"What caused settlement delays?","session_id":"demo-session"}'
 ```
 
-Viewers can chat and search. Analysts can also run structured Python analysis and MCP-style employee/service tools. Administrators can use all tools, including `GET /api/tools/admin/index-status`. A Viewer request routed to multi-document analysis is safely denied with a visible authorization event; direct calls to protected analyst tools return HTTP 403. See [role permissions and endpoints](docs/rbac-tools.md).
+Viewers can chat and search. Analysts can also run structured Python analysis and MCP-style employee/service tools. Administrators can use all tools, including `GET /api/tools/admin/index-status`. A Viewer request routed to multi-document analysis is safely denied with a visible authorization event; direct calls to protected analyst tools return HTTP 403. See [role permissions and endpoint verification](docs/testing/role-based-testing.md).
 
 ## Security and guardrails
 
