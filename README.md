@@ -22,7 +22,7 @@ Feature branches flow into `features`, then into `testing` for verification, and
 
 ## Testing completion
 
-The local testing record reports all 10 feature areas and the Streamlit UI check passing: 11 checks passed, 0 failed. This covers local services and sample data; external Pinecone, hosted embedding, MCP, and LangSmith trace delivery were not tested in that run. See the full [testing record](docs/testing.md) for test details and repeat steps.
+The local testing record reports all 10 feature areas and the Streamlit UI check passing: 11 checks passed, 0 failed. This covers local services and sample data; external Pinecone, hosted embedding, MCP, and LangSmith trace delivery were not tested in that run. See the full [testing record](docs/testing/testing.md) for test details and repeat steps, including the verified role endpoint matrix.
 
 ![Jerry testing completion table: 11 checks passed and 0 failed](docs/img/testings/testing-results.png)
 
@@ -190,7 +190,7 @@ curl -X POST http://127.0.0.1:8010/api/chat \
   -d '{"query":"What caused settlement delays?","session_id":"demo-session"}'
 ```
 
-Viewers can chat and search. Analysts can also run structured Python analysis and MCP-style employee/service tools. Administrators can use all tools, including `GET /api/tools/admin/index-status`. A Viewer request routed to multi-document analysis is safely denied with a visible authorization event; direct calls to protected analyst tools return HTTP 403. See [role permissions and endpoints](docs/rbac-tools.md).
+Viewers can chat and search. Analysts can also run structured Python analysis and MCP-style employee/service tools. Administrators can use all tools, including `GET /api/tools/admin/index-status`. A Viewer request routed to multi-document analysis is safely denied with a visible authorization event; direct calls to protected analyst tools return HTTP 403. See [role permissions and endpoint results](docs/testing/role-based-testing.md).
 
 ## Security and guardrails
 
