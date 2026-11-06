@@ -61,6 +61,34 @@ streamlit run ui/streamlit_app.py --server.port 8501
 
 Open [http://127.0.0.1:8501](http://127.0.0.1:8501) in a browser. The API health check is at [http://127.0.0.1:8010/health](http://127.0.0.1:8010/health), and interactive API documentation is at [http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs).
 
+### Run the development stack with Docker
+
+Docker Compose starts the FastAPI backend and Streamlit UI in separate containers. The source tree is mounted into both containers so code changes reload during development. The API listens on container port `8010` and the UI on `8501`; override the host ports with `JERRY_API_PORT` and `JERRY_UI_PORT` if those ports are already occupied.
+
+1. Create `.env` from `.env.example` if you do not already have a local environment file, then configure any optional providers or demo-token overrides.
+
+   ```powershell
+   if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+   ```
+
+2. Build the image and start the development services:
+
+   ```powershell
+   docker compose up --build
+   ```
+
+3. Open [http://localhost:8501](http://localhost:8501). The API is available at [http://localhost:8010](http://localhost:8010), with health at `/health` and OpenAPI docs at `/docs`.
+
+4. In a second terminal, build the local sample document index when needed:
+
+   ```powershell
+   docker compose run --rm ingest
+   ```
+
+   This writes `data/local_index.jsonl` in the project folder through the development bind mount. The ingestion service uses local embeddings and does not require a Pinecone API key.
+
+Stop the stack with `Ctrl+C`, then run `docker compose down` to remove the containers. `.env` is excluded from the build context; keep provider keys in that local file and do not commit it.
+
 ### 3. Choose a demo account and ask a question
 
 In the left sidebar, select a demo account. The supplied demo token is filled in automatically and masked. Ask about the indexed sample documents in the chat box and press Enter. For example:
