@@ -11,3 +11,15 @@ FastAPI resolves `X-Demo-Token` to a server-side demo identity in `security/auth
 | Administrator | Yes | Yes | Yes | Yes |
 
 Protected endpoints are documented at `/docs`: `POST /api/tools/search`, `POST /api/tools/analysis`, `GET /api/tools/employees`, `GET /api/tools/services`, and `GET /api/tools/admin/index-status`. MCP data is local fictional demo content behind an MCP-client-style boundary; it does not require a running MCP server.
+
+## Verified endpoint results
+
+The local API was called on 2026-11-07 using each default demo token. The observed HTTP status codes were:
+
+| Role | Search | Analysis | Employee directory | Service catalog | Admin index status |
+|---|---:|---:|---:|---:|---:|
+| Viewer | 200 | 403 | 403 | 403 | 403 |
+| Analyst | 200 | 200 | 200 | 200 | 403 |
+| Administrator | 200 | 200 | 200 | 200 | 200 |
+
+The 403 responses are expected access denials. Full request examples are in the [testing record](testing.md).

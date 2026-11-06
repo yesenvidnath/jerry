@@ -4,6 +4,8 @@
 **Git branch:** `testing`  
 **Scope:** Local application smoke checks and the ten assignment feature areas.
 
+The direct role endpoint matrix below was re-run against the local API on 2026-11-07.
+
 ## Result
 
 All 10 feature-area checks and the Streamlit UI smoke check passed (11 checks total, 0 failed). The currently running local API and UI were also reachable:
@@ -64,3 +66,49 @@ From the repository root, with project dependencies installed:
 3. Open `http://127.0.0.1:8501/`, select a demo role, and ask “What are the policies?” to check the grounded response and its source. Use Analyst to exercise analysis/MCP tools; use Administrator to access the admin-only status tool.
 
 4. Open `http://127.0.0.1:8010/docs` to inspect the API schemas and endpoints. The test record above was produced with local in-process API tests, and is not a replacement for deployment tests against configured Pinecone, embedding, MCP, or LangSmith services.
+
+## Role-based access: live endpoint results
+
+These checks were sent to the running FastAPI service at `http://127.0.0.1:8010` on 2026-11-07 with the local demo tokens. Search used `{"query":"security policy","top_k":1}`. Analysis used one valid synthetic passage. Employee, service, and admin-status calls were GET requests.
+
+| Role | `POST /api/tools/search` | `POST /api/tools/analysis` | `GET /api/tools/employees` | `GET /api/tools/services` | `GET /api/tools/admin/index-status` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Viewer | 200 | 403 | 403 | 403 | 403 |
+| Analyst | 200 | 200 | 200 | 200 | 403 |
+| Administrator | 200 | 200 | 200 | 200 | 200 |
+
+These are observed HTTP results from the local API. All roles could search; Viewer was denied analysis and restricted tools; Analyst could use analysis and employee/service lookups but was denied admin status; Administrator succeeded on every tested tool endpoint. HTTP 403 is the expected result for a prohibited operation.
+
+For implementation details and the role matrix, see [role-based testing](role-based-testing.md). The PowerShell steps below reproduce these checks using the default demo tokens (replace them if environment variables override the defaults).
+
+```powershell
+$base = "http://127.0.0.1:8010"
+$roles = @(
+    @{ Name = "Viewer"; Token = "viewer-demo-token" },
+    @{ Name = "Analyst"; Token = "analyst-demo-token" },
+    @{ Name = "Administrator"; Token = "admin-demo-token" }
+)
+$endpoints = @(
+    @{ Method = "POST"; Path = "/api/tools/search"; Body = '{"query":"security policy","top_k":1}' },
+    @{ Method = "POST"; Path = "/api/tools/analysis"; Body = '{"passages":[{"document_id":"test-doc","title":"Test incident","chunk_id":"test-1","passage":"The incident was caused by a delayed database failover."}]}' },
+    @{ Method = "GET"; Path = "/api/tools/employees" },
+    @{ Method = "GET"; Path = "/api/tools/services" },
+    @{ Method = "GET"; Path = "/api/tools/admin/index-status" }
+)
+foreach ($role in $roles) {
+    foreach ($endpoint in $endpoints) {
+        $headers = @{ "X-Demo-Token" = $role.Token }
+        try {
+            $request = @{ Uri = "$base$($endpoint.Path)"; Method = $endpoint.Method; Headers = $headers; UseBasicParsing = $true }
+            if ($endpoint.Body) { $request.ContentType = "application/json"; $request.Body = $endpoint.Body }
+            $response = Invoke-WebRequest @request
+            $status = [int]$response.StatusCode
+        } catch {
+            $status = [int]$_.Exception.Response.StatusCode
+        }
+        "{0,-15} {1,-4} {2,-38} {3}" -f $role.Name, $endpoint.Method, $endpoint.Path, $status
+    }
+}
+```
+
+The role selector in Streamlit only selects a demo identity. To test authorization fully, use each account against the protected endpoints as shown above; this is demo-token authentication, not a production login system.
