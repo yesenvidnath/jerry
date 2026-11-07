@@ -6,6 +6,8 @@
 
 The direct role endpoint matrix below was re-run against the local API on 2026-11-07.
 
+Docker development checks are documented separately in the [Docker smoke-test record](docker-testing.md).
+
 ## Result
 
 All 10 feature-area checks and the Streamlit UI smoke check passed (11 checks total, 0 failed). The currently running local API and UI were also reachable:

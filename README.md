@@ -89,6 +89,8 @@ Docker Compose starts the FastAPI backend and Streamlit UI in separate container
 
 Stop the stack with `Ctrl+C`, then run `docker compose down` to remove the containers. `.env` is excluded from the build context; keep provider keys in that local file and do not commit it.
 
+See the [Docker smoke-test results](docs/testing/docker-testing.md) for the checks run against the Docker setup.
+
 ### 3. Choose a demo account and ask a question
 
 In the left sidebar, select a demo account. The supplied demo token is filled in automatically and masked. Ask about the indexed sample documents in the chat box and press Enter. For example:
