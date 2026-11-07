@@ -1,0 +1,61 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: "8010"
+      API_BASE_URL: http://api:8010
+    command: uvicorn api.main:app --reload --host 0.0.0.0 --port 8010
+    ports:
+      - "${JERRY_API_PORT:-8010}:8010"
+    volumes:
+      - .:/workspace
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_BASE_URL: http://api:8010
+    command: streamlit run ui/streamlit_app.py --server.address=0.0.0.0 --server.port=8501
+    ports:
+      - "${JERRY_UI_PORT:-8501}:8501"
+    volumes:
+      - .:/workspace
+    depends_on:
+      api:
+        condition: service_healthy
+
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      EMBEDDING_PROVIDER: local
+      VECTOR_BACKEND: local
+    profiles:
+      - tools
+    volumes:
+      - .:/workspace
+    command: python scripts/ingest_sample_data.py --backend local

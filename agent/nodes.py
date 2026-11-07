@@ -71,10 +71,12 @@ async def retrieve(state: dict[str, Any]) -> dict[str, Any]:
 
 def check_evidence(state: dict[str, Any]) -> dict[str, Any]:
     passages = state.get("retrieved", [])
-    sufficient = bool(passages) and max(
-        (float(item.get("dense_score", 0)) + float(item.get("sparse_score", 0)) for item in passages),
-        default=0,
-    ) > 0
+    semantic_embeddings = os.getenv("EMBEDDING_PROVIDER", "local").lower() != "local"
+    sufficient = any(
+        float(item.get("sparse_score", 0)) > 0
+        or (semantic_embeddings and float(item.get("dense_score", 0)) >= 0.2)
+        for item in passages
+    )
     events = _event(state, "check_evidence", "complete", "Evidence found" if sufficient else "No matching evidence")
     return {"evidence_sufficient": sufficient, "activity": events}
 

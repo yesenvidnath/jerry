@@ -1,6 +1,7 @@
 """Explainable hybrid retrieval and asynchronous service interface."""
 
 import asyncio
+import os
 
 from models.retrieval import RetrievalFilters, SearchResult
 from retrieval.dense import dense_search
@@ -23,8 +24,15 @@ def hybrid_search(
     if dense_weight < 0 or sparse_weight < 0 or dense_weight + sparse_weight <= 0:
         raise ValueError("Weights must be non-negative and at least one must be positive")
     limit = candidate_k or max(top_k * 3, top_k)
-    dense = dense_search(query, top_k=limit, filters=filters)
     sparse = sparse_search(query, top_k=limit, filters=filters)
+    semantic_embeddings = os.getenv("EMBEDDING_PROVIDER", "local").lower() != "local"
+    if semantic_embeddings:
+        dense = dense_search(query, top_k=limit, filters=filters)
+    else:
+        # Feature-hash vectors are deterministic demo features, not semantic
+        # embeddings. Do not let their arbitrary collisions outrank BM25 hits.
+        dense = []
+        dense_weight, sparse_weight = 0.0, 1.0
     merged: dict[str, SearchResult] = {item.chunk_id: item for item in dense}
     sparse_by_id = {item.chunk_id: item for item in sparse}
     for chunk_id, item in sparse_by_id.items():

@@ -1,7 +1,15 @@
 """Streamlit chat UI with live graph events and LangSmith trace metadata."""
 
 import os
+from pathlib import Path
+import sys
 from uuid import uuid4
+
+# Streamlit may put only ui/ on sys.path when launched from this script path.
+# Add the repository root so top-level project packages import consistently.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
 
