@@ -103,7 +103,7 @@
   {\large A technical reference for the local demonstration application\par}
   \vfill
   \begin{tabular}{@{}ll@{}}
-    Document revision: & 1.0 \\
+    Document revision: & 1.1 \\
     Reference date: & November 2026 \\
     Application branch model: & feature development through testing and production \\
     Primary interfaces: & Streamlit user interface and FastAPI service
@@ -192,6 +192,9 @@ The Python package boundary is the repository root; the packages are not nested 
 \caption{Jerry components and the primary request, retrieval, and data paths. Solid arrows show the main runtime flow; dashed arrows mark supporting or optional integrations.}
 \label{fig:architecture}
 \end{figure}
+
+\section{Development container topology}
+Docker Compose defines \code{api}, \code{ui}, and \code{ingest} services from the root \code{Dockerfile}. API and UI bind-mount project source at \code{/workspace}; Uvicorn uses \code{--reload}. Compose publishes the API on host port 8010 and Streamlit on 8501, configurable with \code{JERRY_API_PORT} and \code{JERRY_UI_PORT}. The UI calls the API at \code{http://api:8010}; the API health check gates UI startup. Ingestion uses local embeddings and indexing, writing \code{data/local_index.jsonl} to the bind mount. This development setup is not production-hardened.
 
 \section{Package responsibilities}
 \begin{longtable}{@{}L{30mm}L{42mm}L{75mm}@{}}
@@ -282,6 +285,24 @@ streamlit run ui/streamlit_app.py --server.port 8501
 \end{lstlisting}
 Open \url{http://127.0.0.1:8501/}. The API root is \url{http://127.0.0.1:8010/}, health check is \url{http://127.0.0.1:8010/health}, and interactive OpenAPI documentation is \url{http://127.0.0.1:8010/docs}.
 
+\section{Run the development stack with Docker Compose}
+Docker Compose is an alternative local development workflow. Docker Desktop with Linux containers and the Compose plugin is required. The optional local \code{.env} file is read at runtime; it is excluded from the Docker build context and should not be committed. If no \code{.env} exists, the application defaults to local providers and demo tokens.
+
+From the repository root in PowerShell, build the images and start the API and UI in the background:
+\begin{lstlisting}[language=bash]
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+docker compose up --build -d
+\end{lstlisting}
+Create or refresh the sample index:
+\begin{lstlisting}[language=bash]
+docker compose run --rm ingest
+\end{lstlisting}
+The ingestion service explicitly uses local embeddings and a local index; it does not require a Pinecone key. Open \url{http://localhost:8501/}; the API health endpoint and documentation are at \url{http://localhost:8010/health} and \url{http://localhost:8010/docs}. Stop and remove the development containers with:
+\begin{lstlisting}[language=bash]
+docker compose down
+\end{lstlisting}
+The source bind mount supports development reloads. The defaults use host ports 8010 and 8501; when either host port is occupied, set \code{JERRY_API_PORT} or \code{JERRY_UI_PORT} before invoking Compose. Inside the Compose network, the UI must use \code{http://api:8010} as the backend URL.
+
 \section{Use the chat interface}
 \begin{enumerate}
   \item Select a demo account in the sidebar. Its demo token is filled automatically and shown masked.
@@ -314,7 +335,7 @@ Local ingestion is the default. Pinecone can be selected with \code{--backend pi
 
 Settings are read from the process environment and, when present, a local \code{.env} file. The example template should retain local providers and tracing disabled until an operator explicitly configures an external service.
 
-\begin{longtable}{@{}L{37mm}L{25mm}L{83mm}@{}}
+\begin{longtable}{@{}>{\scriptsize\raggedright\arraybackslash}p{49mm}>{\scriptsize\raggedright\arraybackslash}p{36mm}L{55mm}@{}}
 \toprule
 \textbf{Variable} & \textbf{Local default} & \textbf{Purpose / notes} \\
 \midrule
@@ -432,7 +453,8 @@ Knowledge search returns source-linked results. Python analysis accepts one to 1
 
 Except for root and health routes, API access uses \code{X-Demo-Token}. Chat bodies have a query of 1 to 4,000 characters and an optional session ID of 1 to 120 characters. The session ID defaults to \code{demo} if omitted.
 
-\begin{longtable}{@{}L{16mm}L{46mm}L{23mm}L{55mm}@{}}
+{\setlength{\tabcolsep}{2pt}
+\begin{longtable}{@{}L{16mm}>{\scriptsize\raggedright\arraybackslash}p{60mm}L{28mm}L{45mm}@{}}
 \toprule
 \textbf{Method} & \textbf{Path} & \textbf{Access} & \textbf{Purpose} \\
 \midrule
@@ -454,6 +476,7 @@ GET & \code{/api/tools/services} & Analyst or Administrator & Local fictional se
 GET & \code{/api/tools/admin/index-status} & Administrator & Local index existence/status. \\
 \bottomrule
 \end{longtable}
+}
 
 \section{Chat request example}
 \begin{lstlisting}
@@ -520,6 +543,7 @@ The event panel can be reviewed in Figure~\ref{fig:activity}. It represents an e
 \section{Recorded local result}
 The test record dated November 6, 2026 reports 10 feature areas plus the Streamlit UI smoke check: 11 checks passed and zero failed. The local API root, health endpoint, OpenAPI docs, and Streamlit page each returned HTTP 200. The local sample corpus contained five documents and five indexed chunks.
 
+{\setlength{\tabcolsep}{3pt}
 \begin{longtable}{@{}>{\bfseries}L{6mm}L{32mm}L{92mm}L{12mm}@{}}
 \toprule
 \textbf{No.} & \textbf{Feature} & \textbf{Recorded check} & \textbf{Result} \\
@@ -542,10 +566,32 @@ The test record dated November 6, 2026 reports 10 feature areas plus the Streaml
 UI & Streamlit interface & AppTest renders title and chat input without app exception. & PASS \\
 \bottomrule
 \end{longtable}
+}
 \textit{* Local stream and trace-ID behavior was exercised; no LangSmith trace was sent.}
 
 \section{Coverage not established}
 The recorded run did not contact Pinecone, hosted semantic embeddings, an external MCP server, or the LangSmith service. It does not establish retrieval performance on a larger corpus, multi-worker behavior, deployment security, or production availability. AppTest emitted its standard bare-mode \code{ScriptRunContext} warning but no application exception.
+
+\section{Docker development verification}
+On November 7, 2026, the Docker Compose development path was checked on Windows with Docker Desktop 29.9.2 and Compose 5.6.1. The images built successfully, both application services ran, and the API health check reported healthy.
+
+\begin{tabularx}{\textwidth}{@{}L{58mm}Y@{}}
+\toprule
+\textbf{Check} & \textbf{Observed result} \\
+\midrule
+Docker Engine / Compose versions & 29.9.2 / 5.6.1 \\
+Compose image build & PASS; API and UI images built \\
+API container health & Healthy \\
+\code{GET /health} & HTTP 200 \\
+\code{GET /docs} & HTTP 200 \\
+Streamlit at host port 8501 & HTTP 200 \\
+UI container to \code{http://api:8010/health} & HTTP 200; Compose DNS path works \\
+Local ingestion service & PASS; 5 sample documents and 5 chunks indexed \\
+Authenticated chat request & HTTP 200; 1 citation and a trace ID returned \\
+\bottomrule
+\end{tabularx}
+
+These results establish a local development smoke test only. The trace ID does not by itself establish remote LangSmith delivery, and this run does not assess production security or external provider integrations. The detailed record is \code{docs/testing/docker-testing.md}.
 
 \section{Repeat the manual checks}
 \begin{enumerate}
@@ -576,6 +622,8 @@ HTTP 403 & Use a role permitted to perform the operation. This is expected for V
 HTTP 409 & Start a fresh session if the user identity or role has changed. \\
 HTTP 422 & Check required fields, text lengths, and the schema in \url{http://127.0.0.1:8010/docs}. \\
 HTTP 429 & Wait for the per-user token bucket to refill; inspect \code{Retry-After}. \\
+Docker port already in use & Change \code{JERRY_API_PORT} or \code{JERRY_UI_PORT}, then restart the Compose stack. \\
+UI cannot reach API in Docker & Set the UI backend URL to \code{http://api:8010}; \code{localhost} inside a container is that same container. \\
 Tracing disabled & Configure the explicit enable flag and key in a private \code{.env} file. Do not commit the key. \\
 \bottomrule
 \end{longtable}
@@ -608,6 +656,7 @@ This manual consolidates information from the following repository sources. They
   \item \code{docs/session-memory.md} and \code{docs/testing/role-based-testing.md}
   \item \code{docs/security-guardrails.md} and \code{docs/resilience.md}
   \item \code{docs/observability.md} and \code{docs/testing/testing.md}
+  \item \code{Dockerfile}, \code{docker-compose.yml}, and \code{docs/testing/docker-testing.md}
 \end{itemize}
 
 \appendix
