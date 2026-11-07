@@ -4,6 +4,10 @@
 **RBAC endpoint verification:** 2026-11-07 (local API at `127.0.0.1:8010`)  
 **Scope:** Local application smoke checks and the ten assignment feature areas.
 
+The direct role endpoint matrix below was re-run against the local API on 2026-11-07.
+
+Docker development checks are documented separately in the [Docker smoke-test record](docker-testing.md).
+
 ## Result
 
 All 10 feature-area checks and the Streamlit UI smoke check passed (11 checks total, 0 failed). The currently running local API and UI were also reachable:
@@ -67,7 +71,11 @@ From the repository root, with project dependencies installed:
 
 ## Role-based access: live endpoint results
 
+<<<<<<< HEAD
 The following checks were sent to the running local FastAPI service on 2026-11-07 using the default local demo tokens. These are observed HTTP responses, not expected results copied from the permission table. Search was exercised as a `POST` with `{"query":"security policy","top_k":1}`. Analysis was exercised as a `POST` with one valid synthetic passage. Employee, service, and admin index-status operations were `GET` requests.
+=======
+These checks were sent to the running FastAPI service at `http://127.0.0.1:8010` on 2026-11-07 with the local demo tokens. Search used `{"query":"security policy","top_k":1}`. Analysis used one valid synthetic passage. Employee, service, and admin-status calls were GET requests.
+>>>>>>> 18c95ef7e0c13fc852a44ec130f40510e3956b10
 
 | Role | `POST /api/tools/search` | `POST /api/tools/analysis` | `GET /api/tools/employees` | `GET /api/tools/services` | `GET /api/tools/admin/index-status` |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -75,11 +83,17 @@ The following checks were sent to the running local FastAPI service on 2026-11-0
 | Analyst | 200 | 200 | 200 | 200 | 403 |
 | Administrator | 200 | 200 | 200 | 200 | 200 |
 
+<<<<<<< HEAD
 The observed results match the configured policy: all three roles can search; Viewers cannot run analysis or restricted tools; Analysts can run analysis and MCP-style lookups but cannot use the administrator endpoint; Administrators can access all tested endpoints. A `403` for a prohibited operation is the expected denial and counts as a passing authorization check.
 
 ### Reproduce the checks
 
 Start the API, then run this PowerShell snippet from the repository root. The demo tokens below are local fallback values; environment overrides may require different values.
+=======
+These are observed HTTP results from the local API. All roles could search; Viewer was denied analysis and restricted tools; Analyst could use analysis and employee/service lookups but was denied admin status; Administrator succeeded on every tested tool endpoint. HTTP 403 is the expected result for a prohibited operation.
+
+For implementation details and the role matrix, see [role-based testing](role-based-testing.md). The PowerShell steps below reproduce these checks using the default demo tokens (replace them if environment variables override the defaults).
+>>>>>>> 18c95ef7e0c13fc852a44ec130f40510e3956b10
 
 ```powershell
 $base = "http://127.0.0.1:8010"
@@ -88,7 +102,11 @@ $roles = @(
     @{ Name = "Analyst"; Token = "analyst-demo-token" },
     @{ Name = "Administrator"; Token = "admin-demo-token" }
 )
+<<<<<<< HEAD
 $paths = @(
+=======
+$endpoints = @(
+>>>>>>> 18c95ef7e0c13fc852a44ec130f40510e3956b10
     @{ Method = "POST"; Path = "/api/tools/search"; Body = '{"query":"security policy","top_k":1}' },
     @{ Method = "POST"; Path = "/api/tools/analysis"; Body = '{"passages":[{"document_id":"test-doc","title":"Test incident","chunk_id":"test-1","passage":"The incident was caused by a delayed database failover."}]}' },
     @{ Method = "GET"; Path = "/api/tools/employees" },
@@ -96,7 +114,11 @@ $paths = @(
     @{ Method = "GET"; Path = "/api/tools/admin/index-status" }
 )
 foreach ($role in $roles) {
+<<<<<<< HEAD
     foreach ($endpoint in $paths) {
+=======
+    foreach ($endpoint in $endpoints) {
+>>>>>>> 18c95ef7e0c13fc852a44ec130f40510e3956b10
         $headers = @{ "X-Demo-Token" = $role.Token }
         try {
             $request = @{ Uri = "$base$($endpoint.Path)"; Method = $endpoint.Method; Headers = $headers; UseBasicParsing = $true }
@@ -111,8 +133,12 @@ foreach ($role in $roles) {
 }
 ```
 
+<<<<<<< HEAD
 Tool-level checks confirm direct endpoint authorization. The existing feature-suite record also exercised the Viewer analysis denial through the assistant graph; changing the UI account selector alone only switches the demo identity and does not exercise every tool. For authorization implementation notes, see [role-based testing](role-based-testing.md).
 
 ## Scope notes
 
 These requests used the local demo-token scheme, not a production identity provider. MCP-style endpoints returned local fictional demo data; no external MCP server was involved. The checks verify tool endpoint permissions and do not establish production authentication readiness.
+=======
+The role selector in Streamlit only selects a demo identity. To test authorization fully, use each account against the protected endpoints as shown above; this is demo-token authentication, not a production login system.
+>>>>>>> 18c95ef7e0c13fc852a44ec130f40510e3956b10
